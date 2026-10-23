@@ -4,7 +4,10 @@
 #  Pi-hole (blocage pubs/trackers) + Unbound (résolveur récursif local)
 #  Prévu pour : Debian 12/13, Ubuntu Server 22.04/24.04
 #
-#  Usage :  sudo bash install-dns-souverain.sh
+#  Usage :  sudo bash install-dns-souverain.sh            (résolution directe)
+#           sudo bash install-dns-souverain.sh --chiffre  (DNS chiffré via
+#                                    Quad9 ou Mullvad, au choix)
+#           Option directe : --chiffre=quad9  ou  --chiffre=mullvad
 #  Relançable sans risque : il détecte ce qui est déjà en place.
 #
 #  Licence MIT — https://github.com/Patart50/dns-souverain
@@ -30,6 +33,18 @@ UNBOUND_CONF=/etc/unbound/unbound.conf.d/pi-hole.conf
 PIHOLE_TOML=/etc/pihole/pihole.toml
 UPSTREAM='127.0.0.1#5335'
 
+# ---------- Options ----------
+MODE=direct; FOURNISSEUR=""
+for arg in "$@"; do
+  case "$arg" in
+    --chiffre)          MODE=chiffre ;;
+    --chiffre=quad9)    MODE=chiffre; FOURNISSEUR=quad9 ;;
+    --chiffre=mullvad)  MODE=chiffre; FOURNISSEUR=mullvad ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    *) echo "Option inconnue : $arg (voir --help)"; exit 1 ;;
+  esac
+done
+
 # =====================================================================
 etape "1/8  Vérifications de base"
 # =====================================================================
@@ -40,6 +55,25 @@ if [[ "${ID:-}" != "debian" && "${ID:-}" != "ubuntu" && "${ID_LIKE:-}" != *debia
   stop "Système non supporté (${PRETTY_NAME:-inconnu}). Utilisez Debian ou Ubuntu Server."
 fi
 ok "Système : ${PRETTY_NAME}"
+
+if [[ "$MODE" == "chiffre" && -z "$FOURNISSEUR" ]]; then
+  echo
+  echo "  Mode chiffré : vos requêtes DNS partiront chiffrées (DNS over TLS)"
+  echo "  vers UN résolveur public. Votre FAI ne les verra plus, mais ce"
+  echo "  résolveur, lui, les verra toutes."
+  echo "    1) Quad9   (fondation suisse à but non lucratif)"
+  echo "    2) Mullvad (fournisseur VPN suédois, sans filtrage)"
+  read -r -p "  Votre choix [1/2] : " CHOIX < /dev/tty || true
+  case "$CHOIX" in
+    2) FOURNISSEUR=mullvad ;;
+    *) FOURNISSEUR=quad9 ;;
+  esac
+fi
+if [[ "$MODE" == "chiffre" ]]; then
+  ok "Mode : DNS chiffré via ${FOURNISSEUR}"
+else
+  ok "Mode : résolution directe (sans intermédiaire, non chiffrée)"
+fi
 
 ping -c1 -W3 1.1.1.1 >/dev/null 2>&1 || stop "Pas d'accès Internet. Vérifiez le câble réseau."
 ok "Accès Internet"
@@ -78,6 +112,7 @@ etape "3/8  Test : votre box/FAI laisse-t-elle passer le DNS direct ?"
 # =====================================================================
 # Recommandé par la doc officielle Pi-hole : certains FAI ou box
 # interceptent le DNS, ce qui casse Unbound de façon incompréhensible.
+if [[ "$MODE" == "direct" ]]; then
 REP_UDP=$(dig @198.41.0.4 . NS +norec +time=3 +tries=1 2>/dev/null || true)
 if grep -q "flags:.* aa" <<<"$REP_UDP"; then
   ok "Les serveurs racines répondent en direct (UDP)"
@@ -90,6 +125,9 @@ if grep -q "flags:.* aa" <<<"$(dig @198.41.0.4 . NS +norec +tcp +time=3 +tries=1
 else
   warn "DNS en TCP bloqué : certaines résolutions (DNSSEC) pourront échouer."
   demander "Continuer quand même ?" || stop "Arrêt à votre demande."
+fi
+else
+  ok "Mode chiffré : test des serveurs racines inutile"
 fi
 
 # =====================================================================
@@ -136,6 +174,26 @@ server:
     private-address: 2001:db8::/32
 EOF
 
+if [[ "$MODE" == "chiffre" ]]; then
+  if [[ "$FOURNISSEUR" == "mullvad" ]]; then
+    ADDRS="    forward-addr: 194.242.2.2@853#dns.mullvad.net"
+  else
+    ADDRS="    forward-addr: 9.9.9.9@853#dns.quad9.net
+    forward-addr: 149.112.112.112@853#dns.quad9.net"
+  fi
+  cat >> "$UNBOUND_CONF" <<EOF
+
+    # Certificats pour vérifier l'identité du résolveur chiffré
+    tls-cert-bundle: /etc/ssl/certs/ca-certificates.crt
+
+# Mode chiffré : tout part en DNS over TLS (port 853) vers ${FOURNISSEUR}
+forward-zone:
+    name: "."
+    forward-tls-upstream: yes
+${ADDRS}
+EOF
+fi
+
 # Tampon réseau suffisant pour so-rcvbuf (évite un avertissement)
 echo "net.core.rmem_max=1048576" > /etc/sysctl.d/99-unbound.conf
 sysctl -q -w net.core.rmem_max=1048576 || true
@@ -157,8 +215,12 @@ systemctl restart unbound
 sleep 2
 
 grep -q "status: NOERROR" <<<"$(dig pi-hole.net @127.0.0.1 -p 5335 +time=5 || true)" \
-  || stop "Unbound ne répond pas. Diagnostic :  journalctl -u unbound -n 30"
-ok "Unbound résout les noms en interrogeant directement les racines"
+  || stop "Unbound ne répond pas. Diagnostic :  journalctl -u unbound -n 30 (en mode chiffré, vérifiez que le port 853 sortant n'est pas bloqué)"
+if [[ "$MODE" == "chiffre" ]]; then
+  ok "Unbound résout les noms via ${FOURNISSEUR}, en chiffré (port 853)"
+else
+  ok "Unbound résout les noms en interrogeant directement les racines"
+fi
 
 grep -q "status: SERVFAIL" <<<"$(dig fail01.dnssec.works @127.0.0.1 -p 5335 +time=5 || true)" \
   && ok "DNSSEC : les réponses falsifiées sont bien rejetées" \

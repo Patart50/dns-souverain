@@ -96,12 +96,32 @@ Le script peut être relancé sans risque : il détecte ce qui est déjà instal
 - ❌ **Ce n'est pas du chiffrement** : votre FAI peut toujours voir passer les requêtes
 - ❌ La première visite d'un site peut être légèrement plus lente (ensuite, tout est en cache)
 
+## Option : DNS chiffré (`--chiffre`)
+
+Par défaut, Unbound interroge directement les serveurs d'Internet. Il n'y a aucun intermédiaire, mais les requêtes circulent en clair : presque aucun de ces serveurs n'accepte de connexion chiffrée. **Résolution directe et chiffrement sont donc incompatibles aujourd'hui.** Il faut choisir :
+
+| | Résolution directe (défaut) | Mode chiffré (`--chiffre`) |
+|---|---|---|
+| Le FAI voit vos requêtes DNS | Oui | **Non** |
+| Un tiers voit tout votre historique DNS | **Non** | Oui (Quad9 ou Mullvad) |
+| Dépendance à un service extérieur | Aucune | Le résolveur choisi |
+
+Pour activer le mode chiffré, remplacez la commande de l'étape 3 par :
+
+```bash
+wget https://raw.githubusercontent.com/Patart50/dns-souverain/main/install-dns-souverain.sh && sudo bash install-dns-souverain.sh --chiffre
+```
+
+Le script vous propose **Quad9** (fondation suisse à but non lucratif) ou **Mullvad** (fournisseur VPN suédois). Les requêtes partent chiffrées en DNS over TLS (port 853), et DNSSEC reste vérifié localement. Relancer le script sans `--chiffre` revient à la résolution directe.
+
+> ⚠️ **Dans les deux cas, votre FAI voit quels sites vous visitez** : il voit les adresses IP contactées et, le plus souvent, le nom du site en clair au début de la connexion HTTPS (SNI). Seul un VPN masque cela. Un DNS chiffré réduit ce que le FAI apprend, il ne vous rend pas invisible.
+
 ## Dépannage
 
 | Problème | Piste |
 |---|---|
 | « Réponse anormale des serveurs racines » | Votre box ou FAI filtre le DNS : vérifiez le contrôle parental ou la sécurité de la box |
-| Unbound ne répond pas | `journalctl -u unbound -n 30` |
+| Unbound ne répond pas | `journalctl -u unbound -n 30` (en mode chiffré : vérifiez que le port 853 sortant n'est pas bloqué par la box) |
 | Rien n'est bloqué sur les appareils | Vérifiez l'étape 4 (DNS dans la box), puis reconnectez l'appareil |
 | Mot de passe de l'interface oublié | `sudo pihole setpassword` |
 | Mettre à jour Pi-hole | `sudo pihole -up` |
