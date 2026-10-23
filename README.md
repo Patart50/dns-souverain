@@ -1,5 +1,7 @@
 # dns-souverain 🛡️
 
+🇫🇷 Français · 🇬🇧 [English version](README.en.md)
+
 Transformez un vieux PC en **DNS pour toute la maison** : pubs et pisteurs bloqués sur tous les appareils (PC, téléphones, TV), sans passer par Google, Cloudflare ni votre FAI.
 
 Le script installe et relie automatiquement :
