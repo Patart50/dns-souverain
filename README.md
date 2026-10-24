@@ -2,6 +2,10 @@
 
 🇫🇷 Français · 🇬🇧 [English version](README.en.md)
 
+> ⚠️ **Projet jeune, retours bienvenus**
+> Ce script a été écrit avec soin, mais je n'ai pas pu le tester sur toutes les configurations possibles (modèles de box, versions de Debian/Ubuntu, fournisseurs d'accès…). Il peut donc rester quelques bugs, et je m'en excuse d'avance.
+> Si quelque chose ne marche pas chez vous, ouvrez une [issue](https://github.com/Patart50/dns-souverain/issues) avec le message d'erreur exact, votre système et votre box : je corrigerai au plus vite. Pensez à lire le script avant de le lancer et à l'essayer d'abord sur une machine sans données importantes.
+
 Transformez un vieux PC en **DNS pour toute la maison** : pubs et pisteurs bloqués sur tous les appareils (PC, téléphones, TV), sans passer par Google, Cloudflare ni votre FAI.
 
 Le script installe et relie automatiquement :

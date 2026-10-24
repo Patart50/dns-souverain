@@ -2,6 +2,10 @@
 
 🇫🇷 [Version française](README.md) · 🇬🇧 English
 
+> ⚠️ **Early-stage project, feedback welcome**
+> This script was written carefully, but I haven't been able to test it on every possible setup (router models, Debian/Ubuntu versions, ISPs…). Some bugs may remain, and I apologise in advance.
+> If something doesn't work for you, please open an [issue](https://github.com/Patart50/dns-souverain/issues) with the exact error message, your system and your router model, and I'll fix it as quickly as I can. Read the script before running it, and try it first on a machine with no important data.
+
 Turn an old PC into a **DNS server for your whole home**: ads and trackers blocked on every device (computers, phones, TV), without going through Google, Cloudflare or your ISP.
 
 The script automatically installs and wires together:
